@@ -2,13 +2,11 @@ TARGET=$1
 COLLABORATOR=$2
 sleep 1;
 echo '\e[93m Amass Scan'
-amass enum -d $TARGET | tee -a TARGET.txt;
-sleep 2;
-echo '\e[93m Assetfinder Scan'
-echo '$TARGET' | assetfinder -subs-only | tee -a TARGET.txt;
-sleep 2;
-echo '\e[93m Subfinder Scan'
-subfinder -d $TARGET | tee -a TARGET.txt;
+curl -s "https://crt.sh/?q=${TARGET}&output=json" | jq -r '.[] | "\(.name_value)\n\(.common_name)"' | sort -u | tee -a TARGET.txt
+cat sources.txt | while read source; do theHarvester -d "${TARGET}" -b $source -f "${source}_${TARGET}";done
+cat *.json | jq -r '.hosts[]' 2>/dev/null | cut -d ':' -f 1 | sort -u | tee -a TARGET.txt
+assetfinder --subs-only $TARGET  | tee -a TARGET.txt
+subfinder -d $TARGET | tee -a TARGET.txt
 sleep 2;
 echo '\033[0m sorting the subdomains'
 sleep 2;
